@@ -80,7 +80,7 @@
 
     document.getElementById("botonConectar").addEventListener("click",()=>{
         var direccion = document.getElementById("textoServer").value;
-        miConexion = new WebSocket("wss://" + direccion + ":8080"); //cambiar a wss al subir a render.com
+        miConexion = new WebSocket("wss://" + direccion); //cambiar a wss al subir a render.com
         boton.style.visibility = "hidden"; //revisar
         
         miConexion.addEventListener("message", (m)=>{
