@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RealTime</title>
+
+    <!--ESTILOS-->
+    <style>
+        /*con # ids, con . class-*/
+        #juego{
+            border: 2px solid black;
+            width: 500px;
+            height: 500px;
+            position: relative;
+        }
+
+        .jugador{
+            display: flex;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            position: absolute;
+            left: 100px;
+            top: 100px;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .fruta{
+            width: 20px;
+            height: 20px;
+            background-color: cornflowerblue;
+            position: absolute;
+            left: 100px;
+            top: 100px;
+        }
+    </style>
+
+</head>
+<body>
+    <h1>Realtime:</h1>
+    <div id="juego">
+        <div class="jugador" id="plantilla"></div>
+        <div class="fruta" id="plantillaComida"></div>
+    </div>
+
+    <!--boton y caja servidor con interior ya escrito con ip-->
+    <div id="BloqueConectar">
+        <input id="textoServer" value="localhost"> <!--cambiar ruta a la que de render.com-->
+        <button id="botonConectar">Conectar</button>
+    </div>
+
+
+<script>
+    //guardo el jugador plantilla(¡ (plueprint) y lo quito de escena
+    var jugadorBlueprint = document.getElementById("plantilla");
+
+    /*************************************/
+    var comidaBlueprint = document.getElementById("plantillaComida");
+    /*************************************/
+
+    var boton = document.getElementById("BloqueConectar");
+    
+    jugadorBlueprint.remove();
+
+    /*************************************/
+    comidaBlueprint.remove();
+    /*************************************/
+
+    //conectar al servidor
+    var miConexion;
+    var miID = -1;
+
+    /*************************************/
+    var comidaID = -1;
+    /*************************************/
+
+    document.getElementById("botonConectar").addEventListener("click",()=>{
+        var direccion = document.getElementById("textoServer").value;
+        miConexion = new WebSocket("wss://" + direccion + ":8080"); //cambiar a wss al subir a render.com
+        boton.style.visibility = "hidden"; //revisar
+        
+        miConexion.addEventListener("message", (m)=>{
+            var mensaje = JSON.parse(m.data.toString());
+
+            if (mensaje.tipo=="new"){
+                //el primer "new" soy yo
+                    //asi sabre mi id
+                if (miID==-1) miID=mensaje.datos.id;
+                //alguien nuevo ha llegado... crearlo en mi escena
+                nuevoJugador = jugadorBlueprint.cloneNode(); //clono prefab
+                    nuevoJugador.id = mensaje.datos.id;
+                    nuevoJugador.dataset.dir=mensaje.datos.dir;//direccion
+                    nuevoJugador.dataset.posX = mensaje.datos.posX;//posicion x
+                    nuevoJugador.dataset.posY = mensaje.datos.posY;//posicion y
+
+                    /*************************************/
+                    nuevoJugador.dataset.puntos = mensaje.datos.puntos;//se añaden los puntos
+                    nuevoJugador.textContent = mensaje.datos.puntos;//se muestran los puntos
+                    /*************************************/
+
+                    nuevoJugador.style.top = mensaje.datos.posY+"px";//mover en pantalla
+                    nuevoJugador.style.left = mensaje.datos.posX+"px";//mover en pantalla
+                document.getElementById("juego").appendChild(nuevoJugador);
+                //alert("ha llegado alguien nuevo");
+
+            }else if(mensaje.tipo=="delete"){
+                //alguien se ha ido... quitarlo de mi escena
+                document.getElementById(mensaje.datos).remove();
+
+            }else if(mensaje.tipo=="mover"){
+                //var datosDelJugador = listaJugadores.get
+                jugadorAMover=document.getElementById(mensaje.datos.id);
+                jugadorAMover.dataset.dir=mensaje.datos.dir;
+                jugadorAMover.dataset.posX = mensaje.datos.posX;
+                jugadorAMover.dataset.posY = mensaje.datos.posY;
+
+                /*************************************/
+                //añadir puntos al jugador si no los tiene
+                if (mensaje.datos.puntos !== undefined) {
+                    jugadorAMover.dataset.puntos = mensaje.datos.puntos;
+                    jugadorAMover.textContent = mensaje.datos.puntos;
+                  }
+
+            }else if (mensaje.tipo=="fruta"){
+                var f = document.getElementById("fruta");
+                if (!f){
+                    f = comidaBlueprint.cloneNode();
+                    f.id = "fruta";
+                    document.getElementById("juego").appendChild(f);
+                }
+                f.dataset.posXFruta = mensaje.datos.posXFruta;
+                f.dataset.posYFruta = mensaje.datos.posYFruta;
+                f.style.left = mensaje.datos.posXFruta + "px";
+                f.style.top = mensaje.datos.posYFruta + "px";
+            }
+            /*************************************/
+        })
+    });
+
+
+    document.addEventListener("keydown",(ev)=>{
+        //buscar mi posicion actual para informar a todos
+        var yo = document.getElementById(miID);
+
+
+        //avisar al server de que me quiero mover
+        mensaje={
+            tipo: "mover",
+            datos: {
+                id: miID,
+                posX: yo.dataset.posX,
+                posY: yo.dataset.posY,
+                dir: ev.key,
+            }
+        }
+        miConexion.send(
+            JSON.stringify(mensaje)
+        );
+    });
+    
+    document.addEventListener("keyup", (ev)=>{
+        //buscar mi posicion actual para informar a todos
+        var yo = document.getElementById(miID);
+        //avisar al server de que me quiero mover
+        mensaje={
+            tipo:"mover",
+            datos: {
+                id: miID,
+                posX: yo.dataset.posX,
+                posY: yo.dataset.posY,
+                dir: "0"
+            }
+        }
+        miConexion.send(
+            JSON.stringify(mensaje)
+        );
+    })
+    //animar automaticamente la posicion de los jugadores
+    setInterval(()=>{
+        //buscar todos los jugadores (div hijos de la clase "jugador")
+        var listaJugadores = document.getElementsByClassName("jugador");
+
+        if(listaJugadores.length<1)return;
+        //para cada uno
+        for (var i=0; i<listaJugadores.length;i++){
+            j=listaJugadores[i];
+        //listaJugadores.forEach(j => {
+            //leer su valor dataset.dir
+            var direccion = j.dataset.dir;
+            //cambiar su posicion en esa direccion
+            if(direccion == "a"){
+                j.dataset.posX = Number(j.dataset.posX)-20;
+            }else if(direccion == "d"){
+                j.dataset.posX = Number(j.dataset.posX)+20;
+            }else if(direccion == "w"){
+                j.dataset.posY = Number(j.dataset.posY)-20;
+            }else if(direccion == "s"){
+                j.dataset.posY = Number(j.dataset.posY)+20;
+            }
+            //limitar rango de movimiento
+            if (j.dataset.posX < 0) j.dataset.posX = 0; //menor que min
+            if (j.dataset.posX > 500-20) j.dataset.posX = 500-20; //mayor que max
+            if (j.dataset.posY < 0) j.dataset.posY = 0; //menor que min
+            if (j.dataset.posY > 500-20) j.dataset.posY = 500-20; //mayor que max
+
+            //dibujar al jugador en su nueva posicion
+            j.style.top = j.dataset.posY + "px";
+            j.style.left = j.dataset.posX + "px";
+        };
+    }, 100)
+</script>
+</body>
+</html>
