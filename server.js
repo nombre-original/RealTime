@@ -1,6 +1,8 @@
 const ws = require("ws");
 
-const server = new ws.WebSocketServer({port:8080}, ()=>{
+const PORT = process.env.PORT || 8080;
+
+const server = new ws.WebSocketServer({ port: PORT }, ()=>{
     console.log("El servidor ha sido creado...");
 });
 
